@@ -2,15 +2,14 @@
 module Translator where
 
 import Data.Either.Combinators (fromRight')
+import Data.List.Zipper
 import qualified Data.Text as T
 import Pdf.Toolbox.Document
 import System.IO
 
 data Sentence = Sentence {sentenceNum :: Int, sentenceText :: T.Text }
 
-data SentenceBlock = SentenceBlock {originalText :: T.Text, translatedText :: T.Text}
-
-data TranslationState = {previous :: [SentenceBlock], current :: SentenceBlock, next :: [SentenceBlock]}
+data SentenceBlock = SentenceBlock {blockNum :: Int, originalText :: T.Text, translatedText :: T.Text}
 
 writeSentenceWithNum :: Sentence -> String
 writeSentenceWithNum s = number ++ ":" ++ sentence
@@ -29,13 +28,17 @@ getSentences str = map toSentence $ zip [1..len] list
     where list = map (flip T.snoc '.') $ init $ T.splitOn "." str
           len = length list
 
+toSentenceBlock :: Sentence -> SentenceBlock
+toSentenceBlock s = SentenceBlock (sentenceNum s) (sentenceText s) ""
+
+makeZipper :: [Sentence] -> Zipper SentenceBlock
+makeZipper = fromList . map toSentenceBlock
+
 getPageText :: MonadIO m => Int -> Pdf m T.Text
 getPageText n = do
     pdf <- document
     catalog <- documentCatalog pdf
     rootNode <- catalogPageNode catalog
-    --count <- pageNodeNKids rootNode
-    --liftIO $ print count
     page <- pageNodePageByNum rootNode n
     pageExtractText page
 
