@@ -16,8 +16,10 @@ import Translator
 
 --updateBuffers :: (TextBufferClass self) => self -> SentenceBlock
 
-mvartest :: Zipper SentenceBlock -> IO (Zipper SentenceBlock)
-mvartest = return . right
+changeCursor :: (Zipper a -> Zipper a) -> Zipper a -> IO (Zipper a, a)
+changeCursor f zip = return (new, cursor new) 
+    where new = f zip
+
 
 main = do
     [file,page] <- getArgs
@@ -32,12 +34,23 @@ main = do
     window `on` deleteEvent $ liftIO mainQuit >> return False
     origText <- builderGetObject builder castToTextView "textview1"
     buffer1 <- textViewGetBuffer origText
+    translText <- builderGetObject builder castToTextView "textview2"
+    buffer2 <- textViewGetBuffer translText
+
     nextButton <- builderGetObject builder castToButton "nextbutton"
     on nextButton buttonActivated $ do
-        modifyMVar_ zipper (return . right)
+        block <- modifyMVar zipper (changeCursor right)
+        textBufferSetText buffer1 $ T.unpack $ originalText block 
+        textBufferSetText buffer2 $ T.unpack $ translatedText block 
+
+    prevButton <- builderGetObject builder castToButton "previousbutton"
+    on prevButton buttonActivated $ do
+        block <- modifyMVar zipper (changeCursor left)
+        textBufferSetText buffer1 $ T.unpack $ originalText block 
+        textBufferSetText buffer2 $ T.unpack $ translatedText block 
+
     current <- withMVar zipper (return . cursor)
-    putStrLn $ T.unpack $ originalText current
     textBufferSetText buffer1 $ T.unpack $ originalText current
-    translatedText <- builderGetObject builder castToTextView "textview2"
+
     widgetShowAll window
     mainGUI
