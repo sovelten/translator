@@ -46,5 +46,3 @@ getPageText n = do
 openPdfFile :: FilePath -> Int -> IO T.Text
 openPdfFile file page = fmap fromRight' $ withBinaryFile file ReadMode $ \handle ->
     runPdfWithHandle handle knownFilters $ getPageText page
-
-
