@@ -24,7 +24,7 @@ changeCursor f zip = return (new, cursor new)
     where new = f zip
 
 updateSentenceBlock :: String -> SentenceBlock -> SentenceBlock
-updateSentenceBlock text (SentenceBlock n orig _) = SentenceBlock n orig text
+updateSentenceBlock text (SentenceBlock n orig _) = SentenceBlock n orig (T.pack text)
 
 textViewGetValue :: TextViewClass self => self -> IO String
 textViewGetValue tv = do
@@ -54,8 +54,8 @@ main = do
 
     nextButton <- builderGetObject builder castToButton "nextbutton"
     on nextButton buttonActivated $ do
-        text2 <- textBufferGetValue buffer2
-        modifyMVar zipper (return . (insert (updateSentenceBlock text2)))
+        text2 <- textViewGetValue translText
+        modifyMVar_ zipper (return (insert (updateSentenceBlock text2)))
         block <- modifyMVar zipper (changeCursor right)
         textBufferSetText buffer1 $ T.unpack $ originalText block
         textBufferSetText buffer2 $ T.unpack $ translatedText block
