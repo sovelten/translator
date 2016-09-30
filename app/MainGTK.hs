@@ -16,6 +16,9 @@ import Translator
 
 --updateBuffers :: (TextBufferClass self) => self -> SentenceBlock
 
+updateZipper :: (Zipper a -> Zipper a) -> Zipper a -> Zipper a
+updateZipper f zip = f zip
+
 changeCursor :: (Zipper a -> Zipper a) -> Zipper a -> IO (Zipper a, a)
 changeCursor f zip = return (new, cursor new)
     where new = f zip
@@ -51,14 +54,14 @@ main = do
 
     nextButton <- builderGetObject builder castToButton "nextbutton"
     on nextButton buttonActivated $ do
+        text2 <- textBufferGetValue buffer2
+        modifyMVar zipper (return . (insert (updateSentenceBlock text2)))
         block <- modifyMVar zipper (changeCursor right)
         textBufferSetText buffer1 $ T.unpack $ originalText block
         textBufferSetText buffer2 $ T.unpack $ translatedText block
 
     prevButton <- builderGetObject builder castToButton "previousbutton"
     on prevButton buttonActivated $ do
-        text2 <- textBufferGetValue buffer2
-        --let currentBlock = updateSentenceBlock 
         block <- modifyMVar insert text zipper
         block <- modifyMVar zipper (changeCursor left)
         textBufferSetText buffer1 $ T.unpack $ originalText block
