@@ -7,32 +7,18 @@ import Data.List.Zipper
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Builder
 import System.Environment
+import System.Exit
 import Translator
 
---goNext :: Zipper SentenceBlock -> IO Zipper SentenceBlock
---goNext z = do
-    --let zipper = right z
-    --textBufferSetText buffer1 setcursor zipper
-
---updateBuffers :: (TextBufferClass self) => self -> SentenceBlock
-
-updateZipper :: (Zipper a -> Zipper a) -> Zipper a -> Zipper a
-updateZipper f zip = f zip
-
-changeCursor :: (Zipper a -> Zipper a) -> Zipper a -> IO (Zipper a, a)
-changeCursor f zip = return (new, cursor new)
-    where new = f zip
-
-updateSentenceBlock :: String -> SentenceBlock -> SentenceBlock
-updateSentenceBlock text (SentenceBlock n orig _) = SentenceBlock n orig (T.pack text)
-
-textViewGetValue :: TextViewClass self => self -> IO String
-textViewGetValue tv = do
-    buf <- textViewGetBuffer tv
+textBufferGetValue :: TextBufferClass self => self -> IO String
+textBufferGetValue buf = do
     start <- textBufferGetStartIter buf
     end <- textBufferGetEndIter buf
     value <- textBufferGetText buf start end True
     return value
+
+statusInfo :: Int -> Int -> Int
+statusInfo page cur total = "page " ++ (show page) ++ ": " ++ (show cur) ++ "/" ++ (show total)
 
 main = do
     [file,page] <- getArgs
@@ -40,6 +26,7 @@ main = do
     sentences <- fmap (makeZipper . getSentences) $ openPdfFile file (read page)
     --create zipper
     zipper <- newMVar sentences
+    exit <- newEmptyMVar
     initGUI
 
     builder <- builderNew
@@ -54,21 +41,35 @@ main = do
 
     nextButton <- builderGetObject builder castToButton "nextbutton"
     on nextButton buttonActivated $ do
-        text2 <- textViewGetValue translText
-        modifyMVar_ zipper (return (insert (updateSentenceBlock text2)))
-        block <- modifyMVar zipper (changeCursor right)
-        textBufferSetText buffer1 $ T.unpack $ originalText block
-        textBufferSetText buffer2 $ T.unpack $ translatedText block
+        text2 <- textBufferGetValue buffer2
+        modifyMVar_ zipper (return . (updateZipper text2))
+        new <- modifyMVar zipper (return . (shiftZipper right))
+        textBufferSetText buffer1 $ T.unpack $ originalText new
+        textBufferSetText buffer2 $ T.unpack $ translatedText new
 
     prevButton <- builderGetObject builder castToButton "previousbutton"
     on prevButton buttonActivated $ do
-        block <- modifyMVar insert text zipper
-        block <- modifyMVar zipper (changeCursor left)
-        textBufferSetText buffer1 $ T.unpack $ originalText block
-        textBufferSetText buffer2 $ T.unpack $ translatedText block
+        text2 <- textBufferGetValue buffer2
+        modifyMVar_ zipper (return . (updateZipper text2))
+        new <- modifyMVar zipper (return . (shiftZipper left))
+        textBufferSetText buffer1 $ T.unpack $ originalText new
+        textBufferSetText buffer2 $ T.unpack $ translatedText new
+
+    exitButton <- builderGetObject builder castToButton "exitbutton"
+    on exitButton buttonActivated
+        $ putMVar exit ExitSuccess
+
+    statusBar <- builderGetObject builder castToStatusbar "statusbar1"
+    id <- statusbarGetContextId statusBar "Line"
+    msgid <- statusbarPush statusBar id (statusInfo (read page) 2 40)
+
+    window `on` deleteEvent $ do
+        liftIO mainQuit
+        return False
 
     current <- withMVar zipper (return . cursor)
     textBufferSetText buffer1 $ T.unpack $ originalText current
+    textBufferSetText buffer2 $ T.unpack $ translatedText current
 
     widgetShowAll window
     mainGUI

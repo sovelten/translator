@@ -19,6 +19,8 @@ writeSentenceWithNum s = number ++ ":" ++ sentence
 writeSentence :: Sentence -> String
 writeSentence s = T.unpack $ sentenceText s
 
+updateSentenceBlock :: String -> SentenceBlock -> SentenceBlock
+updateSentenceBlock text (SentenceBlock n orig _) = SentenceBlock n orig (T.pack text)
 
 toSentence :: (Int,T.Text) -> Sentence
 toSentence (n,t) = Sentence n t
@@ -33,6 +35,15 @@ toSentenceBlock s = SentenceBlock (sentenceNum s) (sentenceText s) ""
 
 makeZipper :: [Sentence] -> Zipper SentenceBlock
 makeZipper = fromList . map toSentenceBlock
+
+updateZipper :: String -> Zipper SentenceBlock -> Zipper SentenceBlock
+updateZipper text zipper = replace new_block zipper
+    where old_block = cursor zipper
+          new_block = updateSentenceBlock text old_block
+
+shiftZipper :: (Zipper a -> Zipper a) -> Zipper a -> (Zipper a, a)
+shiftZipper f zip = (new, cursor new)
+    where new = f zip
 
 getPageText :: MonadIO m => Int -> Pdf m T.Text
 getPageText n = do
