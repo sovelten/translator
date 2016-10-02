@@ -17,14 +17,20 @@ textBufferGetValue buf = do
     value <- textBufferGetText buf start end True
     return value
 
-statusInfo :: Int -> Int -> Int
+statusInfo :: Int -> Int -> Int -> String
 statusInfo page cur total = "page " ++ (show page) ++ ": " ++ (show cur) ++ "/" ++ (show total)
+
+updateBar :: StatusbarClass self => self -> ContextId -> (Int, Int, Int) -> IO ()
+updateBar bar id (page, cur, total) = do
+    msgid <- statusbarPush bar id (statusInfo page cur total)
+    return ()
 
 main = do
     [file,page] <- getArgs
     --load page sentences
     sentences <- fmap (makeZipper . getSentences) $ openPdfFile file (read page)
-    --create zipper
+    let total = length $ toList sentences
+    --create zipper mvar
     zipper <- newMVar sentences
     exit <- newEmptyMVar
     initGUI
@@ -39,29 +45,32 @@ main = do
     translText <- builderGetObject builder castToTextView "textview2"
     buffer2 <- textViewGetBuffer translText
 
+    statusBar <- builderGetObject builder castToStatusbar "statusbar1"
+    id <- statusbarGetContextId statusBar "Line"
     nextButton <- builderGetObject builder castToButton "nextbutton"
+    prevButton <- builderGetObject builder castToButton "previousbutton"
+    exitButton <- builderGetObject builder castToButton "exitbutton"
+
     on nextButton buttonActivated $ do
         text2 <- textBufferGetValue buffer2
         modifyMVar_ zipper (return . (updateZipper text2))
         new <- modifyMVar zipper (return . (shiftZipper right))
+        updateBar statusBar id ((read page), blockNum new, total)
         textBufferSetText buffer1 $ T.unpack $ originalText new
         textBufferSetText buffer2 $ T.unpack $ translatedText new
 
-    prevButton <- builderGetObject builder castToButton "previousbutton"
     on prevButton buttonActivated $ do
         text2 <- textBufferGetValue buffer2
         modifyMVar_ zipper (return . (updateZipper text2))
         new <- modifyMVar zipper (return . (shiftZipper left))
+        updateBar statusBar id ((read page), blockNum new, total)
         textBufferSetText buffer1 $ T.unpack $ originalText new
         textBufferSetText buffer2 $ T.unpack $ translatedText new
 
-    exitButton <- builderGetObject builder castToButton "exitbutton"
     on exitButton buttonActivated
         $ putMVar exit ExitSuccess
 
-    statusBar <- builderGetObject builder castToStatusbar "statusbar1"
-    id <- statusbarGetContextId statusBar "Line"
-    msgid <- statusbarPush statusBar id (statusInfo (read page) 2 40)
+    msgid <- statusbarPush statusBar id (statusInfo (read page) 1 total)
 
     window `on` deleteEvent $ do
         liftIO mainQuit
